@@ -90,9 +90,19 @@ P.S. You can delete this when you're done too. It's your config now! :)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
+if vim.g.started_by_firenvim then
+  vim.g.firenvim_config = vim.g.firenvim_config or {}
+  vim.g.firenvim_config.localSettings = {
+    ['.*'] = {
+      takeover = 'never',
+    },
+  }
+end
+
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = false
 
+vim.wo.relativenumber = true
 -- [[ Setting options ]]
 -- See `:help vim.opt`
 -- NOTE: You can change these options as you wish!
@@ -184,6 +194,7 @@ vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' }
 -- Keybinds to make split navigation easier.
 --  Use CTRL+<hjkl> to switch between windows
 --
+--
 --  See `:help wincmd` for a list of all window commands
 vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
@@ -228,6 +239,13 @@ vim.opt.rtp:prepend(lazypath)
 --
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup({
+  {
+    'glacambre/firenvim',
+    lazy = false, -- Ensure it loads on startup
+    build = function()
+      vim.fn['firenvim#install']()
+    end,
+  },
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
 
@@ -917,6 +935,34 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
+  {
+    'PedramNavid/dbtpal',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-telescope/telescope.nvim',
+    },
+    ft = {
+      'sql',
+      'md',
+      'yaml',
+    },
+    keys = {
+      { '<leader>drf', '<cmd>DbtRun<cr>' },
+      { '<leader>drp', '<cmd>DbtRunAll<cr>' },
+      { '<leader>dtf', '<cmd>DbtTest<cr>' },
+      { '<leader>dm', "<cmd>lua require('dbtpal.telescope').dbt_picker()<cr>" },
+    },
+    config = function()
+      require('dbtpal').setup {
+        path_to_dbt = 'dbt',
+        path_to_dbt_project = '',
+        path_to_dbt_profiles_dir = vim.fn.expand '~/.dbt',
+        extended_path_search = true,
+        protect_compiled_files = true,
+      }
+      require('telescope').load_extension 'dbtpal'
+    end,
+  },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
@@ -938,7 +984,7 @@ require('lazy').setup({
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
