@@ -9,6 +9,7 @@
 --     <leader>mv  inline comment + voice   (also starts SuperWhisper for you)
 --     <leader>mV  whole-doc comment + voice
 --   review-set navigation (when `mdr a.md b.md …` opened a set):
+--     <leader>ma                approve: stamp reviewed_at (pk review) + next
 --     <leader>mn / <leader>mp   save + next / prev doc
 --     <leader>ml                review navigator (floating list, ✓/○/●, jump)
 --     <leader>ms                submit all → fires one /md-review, quits
@@ -116,6 +117,26 @@ return {
           vim.cmd 'next'
         end
       end
+      -- approve: stamp reviewed_at frontmatter (via `pk review`), then advance.
+      -- mdr is the review UI; pk stores the durable trail + logs it to status.md.
+      local function approve_and_next()
+        local f = vim.fn.expand '%:p'
+        if f == '' then return end
+        if vim.bo.modifiable and vim.bo.modified then vim.cmd 'update' end -- save comments first
+        local by = os.getenv 'MDR_SESSION' or 'me'
+        local out = vim.fn.system { 'pk', 'review', f, '-b', by }
+        if vim.v.shell_error ~= 0 then
+          vim.notify('md-review: pk review failed — ' .. out, vim.log.levels.ERROR)
+          return
+        end
+        vim.cmd 'edit' -- reload buffer to show the stamped frontmatter
+        review_state[f] = 'reviewed'; save_state()
+        if vim.fn.argidx() + 1 >= vim.fn.argc() then
+          vim.notify('md-review: approved (last) — <leader>ms to submit', vim.log.levels.INFO)
+        else
+          vim.cmd 'next'
+        end
+      end
       local function save_prev()
         if vim.bo.modifiable and vim.bo.modified then vim.cmd 'update' end
         if vim.fn.argidx() <= 0 then
@@ -206,6 +227,7 @@ return {
           vim.keymap.set('n', '<leader>mC', function() drop { doc = true } end, o 'md: whole-doc comment')
           vim.keymap.set('n', '<leader>mv', function() drop { voice = true } end, o 'md: inline comment + voice')
           vim.keymap.set('n', '<leader>mV', function() drop { doc = true, voice = true } end, o 'md: whole-doc comment + voice')
+          vim.keymap.set('n', '<leader>ma', approve_and_next, o 'md: approve (stamp reviewed_at) + next')
           vim.keymap.set('n', '<leader>mn', function() mark_and_next 'reviewed' end, o 'md: mark reviewed + next')
           vim.keymap.set('n', '<leader>mk', function() mark_and_next 'skipped' end, o 'md: mark NOT reviewed (skip) + next')
           vim.keymap.set('n', '<leader>mp', save_prev, o 'md: prev doc')
@@ -214,7 +236,7 @@ return {
           -- winbar menu, only when a review SET is open (batch)
           if vim.fn.argc() > 1 then
             vim.wo.winbar = '%#MdReviewBar# review %{v:lua.MdReview_pos()} '
-              .. ' [mn]next·ok [mk]skip [mp]prev [ml]list  [mc]note [mv]voice  [ms]submit '
+              .. ' [ma]approve [mn]next·ok [mk]skip [mp]prev [ml]list  [mc]note [mv]voice  [ms]submit '
           end
         end,
       })
