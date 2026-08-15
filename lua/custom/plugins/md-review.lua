@@ -53,6 +53,32 @@ return {
         vim.fn.matchadd('MdReviewComment', '<!-- 💬.*-->')
       end
 
+      -- review-queue context header: when reviewq launched this batch it wrote a
+      -- <abspath>\t<context> map; render the matching line as a display-only
+      -- virtual header at the top of the doc. Never touches the file. Absent for
+      -- session-local batches (no map entry) — context shows only when it helps.
+      local ctx_ns = vim.api.nvim_create_namespace 'mdr_review_context'
+      local function show_review_context(bufnr)
+        local state = os.getenv 'XDG_STATE_HOME' or (os.getenv 'HOME' .. '/.local/state')
+        local ok, lines = pcall(vim.fn.readfile, state .. '/stack-session/review-context.tsv')
+        if not ok then return end
+        local abs = vim.api.nvim_buf_get_name(bufnr)
+        local ctx
+        for _, l in ipairs(lines) do
+          local f, c = l:match '^(.-)\t(.+)$'
+          if f == abs then ctx = c; break end
+        end
+        if not ctx then return end
+        vim.api.nvim_buf_clear_namespace(bufnr, ctx_ns, 0, -1)
+        vim.api.nvim_buf_set_extmark(bufnr, ctx_ns, 0, 0, {
+          virt_lines_above = true,
+          virt_lines = {
+            { { '  ⟪ ' .. ctx .. ' ⟫', 'MdReviewComment' } },
+            { { '', 'Normal' } },
+          },
+        })
+      end
+
       -- Start SuperWhisper by simulating the user's Option+Space global hotkey.
       -- (The superwhisper CLI is read-only; the hotkey is the reliable trigger.)
       -- Deferred so insert mode is live first — SuperWhisper types its result into
@@ -222,6 +248,7 @@ return {
         pattern = 'markdown',
         callback = function(ev)
           highlight()
+          show_review_context(ev.buf)
           local o = function(desc) return { buffer = ev.buf, desc = desc } end
           vim.keymap.set('n', '<leader>mc', function() drop {} end, o 'md: inline comment')
           vim.keymap.set('n', '<leader>mC', function() drop { doc = true } end, o 'md: whole-doc comment')
